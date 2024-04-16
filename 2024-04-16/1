@@ -1,0 +1,30 @@
+#include <stdio.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <sys/wait.h>
+
+int main(){
+	pid_t pid;
+	int x,y;
+	int status;
+
+	scanf("%d %d",&x,&y);
+	pid = fork();
+
+	if(pid>0){
+		int n=x;
+		for(int i=0;i<y;i++)
+			x*=n;
+		wait(&status);
+		printf("result : %d\n",x+(status>>8));
+	}
+	else if(pid==0){
+		int sum =0 ;
+		for(int i=x;i<=y;i++)
+			sum+=i;
+		exit(sum);
+	}
+	else
+		printf("fail\n");
+}
