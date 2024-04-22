@@ -1,32 +1,39 @@
-#include <unistd.h>
+
 #include <stdio.h>
 #include <sys/wait.h>
+#include <unistd.h>
+#include <sys/types.h>
 #include <stdlib.h>
 
-int main(){
-	pid_t pid[10];
-	int status;
+#define MAX_CHILDREN 3
 
-	pid1 = pid2 = -1;
-	pid1= fork();
-	if(pid1 > 0)
-		pid2= fork();
+int main() {
+    pid_t child_pids[MAX_CHILDREN] = {0};
+    int status;
 
-	if(pid1 > 0 && pid2 > 0){
-		waitpid(pid2,&status,0);
-		printf("parent: child2 - exit(%d)\n",status);
-		waitpid(pid1,&status,0);
-		printf("parent: child1 - exit(%d)\n",status);
-	}
-	else if(pid1 == 0 && pid2 == -1)
-	{
-		sleep(1);
-		exit(1);
-	}
-	else if(pid1> 0 && pid2 == 0){
-		sleep(2);
-		exit(2);
-	}
-	else
-		printf("fail to fork\n");
+    for (int i = 0; i < MAX_CHILDREN; i++) {
+        pid_t pid = fork();
+
+        if (pid < 0) {
+            fprintf(stderr, "Fork failed\n");
+            return 1;
+        } else if (pid == 0) { 
+            sleep(i + 1);
+            printf("child%d : exit(%d)\n", i + 1, i + 1);
+            exit(i + 1);
+        } else { 
+            child_pids[i] = pid;
+        }
+    }
+
+    for (int i = 0; i < MAX_CHILDREN; i++) {
+        pid_t pid = child_pids[i];
+        if (pid > 0) {
+            waitpid(pid, &status, 0);
+            printf("parent : child%d - exit(%d)\n", i + 1, WEXITSTATUS(status));
+        }
+    }
+
+    return 0;
 }
+
