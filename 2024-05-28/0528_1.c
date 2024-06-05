@@ -1,57 +1,76 @@
+#include <stdio.h>
 #include <unistd.h>
 #include <signal.h>
-#include <stdio.h>
-#include <signal.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <stdlib.h>
 #include <fcntl.h>
-#include <string.h>
 #include <time.h>
-#include <sys/types.h>
+#include <string.h>
 
-int num=0;
+void handler(int signum);
 
-int main(){
+int main() {
+	struct sigaction act;
 	sigset_t set;
-	int count =10;
 
-	static struct sigaction act;
-
-	void int_handle(int);
-
-	act.sa_handler = int_handle;
 	sigfillset(&(act.sa_mask));
-	sigaction(SIGINT,&act,NULL);
+	act.sa_handler = handler;
+	
+	sigaction(SIGCHLD, &act, NULL);
 
 	sigemptyset(&set);
-	sigfillset(&set);
+	sigaddset(&set, SIGINT);
+	sigprocmask(SIG_BLOCK, &set, NULL);
+	
+	pid_t  pid = fork();
 
-	sigprocmask(SIG_BLOCK,&set,NULL);
-	while(1)
-	{
-		if(num>=1){
-			printf("bye~\n");
-			exit(0);
-		}
-		if(count==5){
-			sigemptyset(&set);
-			sigaddset(&set,SIGINT);
-			sigprocmask(SIG_UNBLOCK,&set,NULL);
-		}
-		else if(count==0){
+	if(pid == 0) {
+		int count = 10;
 
-			exit(0);
+		while(count) {
+			if(count == 5) {
+				sigprocmask(SIG_UNBLOCK, &set, NULL);
+			}
+			printf("I am a child\n");
+			sleep(1);
+			count--;
 		}
-		printf("I am a child\n");
-		count--;
-		sleep(1);
+		sigprocmask(SIG_UNBLOCK, &set, NULL);
+		exit(1);
 	}
+	
+	else {
+		pause();
+	}
+	sigprocmask(SIG_UNBLOCK, &set, NULL);
+	return 0;
 }
+	
+void handler(int signum) {
+	int pid, status;
+	while((pid=waitpid(-1, &status, WNOHANG)) > 0) {
+		int state;
 
-void int_handle(int signum){
-	num++;
-	int fd = open("log.txt",O_RDWR|O_CREAT,0644);
-	time_t t = time(NULL);
-	char* buf = ctime(&t);
-	write(fd,buf,strlen(buf));
-	close(fd);
+		if(WIFEXITED(status)) state = 1;
+		if(WIFSIGNALED(status)) {
+			state = 0;
+			printf("bye~\n");
+		}
+
+		printf("writing\n");
+		int fd;
+		fd = open("log.txt", O_RDWR | O_CREAT, 0644);
+		off_t newpos = lseek(fd, (off_t)0, SEEK_END);
+	
+		time_t t = time(NULL);
+		char *time_str = ctime(&t);
+		time_str[strlen(time_str) - 1] = '\0';
+	
+		char log[256];
+		snprintf(log, sizeof(log), "%d\t%s\t%s\n", pid, time_str, state ? "exit" : "Signal(bye~)");
+	
+		write(fd, log, strlen(log));
+		close(fd);
+	}
 }
